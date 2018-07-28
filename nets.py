@@ -61,8 +61,6 @@ class StackRNN(nn.Module):
                                          nn.LogSigmoid(),
                                          Avg())
 
-
-
     def attention(self, input, mems):
         # input: (bsz, hdim)
         # mems: (seq_len, bsz, hdim)
