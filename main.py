@@ -58,6 +58,10 @@ if __name__ == '__main__':
     opts.train_opts(parser)
     opt = parser.parse_args()
 
+    for i in range(opt.stack_len):
+        ACTIONS['POP%d' % (i + 1)] = i + 1
+    ACTIONS['PASS'] = opt.stack_len + 1
+
     location = opt.gpu if torch.cuda.is_available() and opt.gpu != -1 else 'cpu'
     device = torch.device(location)
     train_iter, valid_iter, SEQ = preproc.get_iters(ftrain=opt.ftrain,
