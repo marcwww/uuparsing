@@ -79,7 +79,8 @@ if __name__ == '__main__':
     utils.init_model(model)
     optimizer = optim.Adam(params=filter(lambda p: p.requires_grad,
                                          model.parameters()),
-                           lr=opt.lr)
+                           lr=opt.lr,
+                           weight_decay=opt.weight_decay)
 
     criterion_lm = nn.CrossEntropyLoss(ignore_index=SEQ.vocab.stoi[PAD])
 
