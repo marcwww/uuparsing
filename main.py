@@ -35,7 +35,11 @@ def train(model, iters, opt, criterion_lm, optim):
             loss.backward()
             optim.step()
 
-            utils.progress_bar(i/len(train_iter), loss.item(), epoch)
+            loss = {'lm_l': loss_lm_left.item(),
+                    'lm_r': loss_lm_right.item(),
+                    'negLogProb': negLogProb.item()}
+
+            utils.progress_bar(i/len(train_iter), loss, epoch)
 
         # valid(model, valid_iter, opt)
 
