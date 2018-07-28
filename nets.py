@@ -46,6 +46,8 @@ class StackRNN(nn.Module):
 
         # self.W_up_n: (stack_len, stack_len, stack_len)
         self.W_up_n = torch.cat(self.W_up_n).view(-1, stack_len, stack_len)
+        self.W_up_n = nn.Parameter(self.W_up_n,
+                                   requires_grad=False)
         self.W_down = nn.Parameter(W_down,
                                    requires_grad=False)
 
