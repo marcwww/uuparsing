@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import utils
 from macros import *
-
+import crash_on_ipy
 
 class Avg(nn.Module):
 
