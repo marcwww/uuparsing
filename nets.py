@@ -22,11 +22,15 @@ class StackRNN(nn.Module):
         super(StackRNN, self).__init__()
 
         self.voc_size = voc_size
+        self.edim = edim
         self.hdim = hdim
         self.stack_len = stack_len
         self.padding_idx = padding_idx
         self.embedding = nn.Embedding(voc_size, edim,
                                 padding_idx=padding_idx)
+
+        assert edim * 2 == hdim, 'hdim must be 2 times of edim'
+
         self.buf_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
         self.stack_rnncell = nn.GRUCell(edim, hdim)
         self.stack = nn.Parameter(torch.zeros(stack_len, hdim),
@@ -155,13 +159,19 @@ class StackRNN(nn.Module):
             stack = self.update_stack(stack, action, to_push)
 
         # negLogProb: (1)
-        negLogProb = -1 * self.top2logProb(stack[:, -1, :])
+        stack_top = stack[:, -1, :]
+        negLogProb = -1 * self.top2logProb(stack_top)
 
         we_T = self.embedding.weight.transpose(0, 1)
-        logits_left = torch.matmul(buf_outs[1:], we_T)
-        logits_right = torch.matmul(buf_outs[:-1], we_T)
+        # forward_outs: (seq_len-1, bsz, edim)
+        # backward_outs: (seq_len-1, bsz, edim)
+        forward_outs = buf_outs[:-1,:,:self.edim]
+        backward_outs = buf_outs[1:,:,self.edim:]
 
-        return logits_left, logits_right, negLogProb
+        logits_forward = torch.matmul(forward_outs, we_T)
+        logits_backward = torch.matmul(backward_outs, we_T)
+
+        return logits_forward, logits_backward, negLogProb
 
 
 

@@ -22,21 +22,21 @@ def train(model, iters, opt, criterion_lm, optim):
 
             model.zero_grad()
 
-            logits_left, logits_right, negLogProb = \
+            logits_forward, logits_backward, negLogProb = \
                 model(inputs)
 
-            loss_lm_left = criterion_lm(logits_left.view(-1, model.voc_size),
-                                        inputs[:-1].view(-1))
-            loss_lm_right = criterion_lm(logits_right.view(-1, model.voc_size),
-                                         inputs[1:].view(-1))
-            loss = (1-opt.lm_coef) * (loss_lm_left + loss_lm_right)/2 + \
+            loss_lm_forward = criterion_lm(logits_forward.view(-1, model.voc_size),
+                                        inputs[1:].view(-1))
+            loss_lm_backward = criterion_lm(logits_backward.view(-1, model.voc_size),
+                                         inputs[:-1].view(-1))
+            loss = (1-opt.lm_coef) * (loss_lm_forward + loss_lm_backward)/2 + \
                    opt.lm_coef * negLogProb
 
             loss.backward()
             optim.step()
 
-            loss = {'lm_l': loss_lm_left.item(),
-                    'lm_r': loss_lm_right.item(),
+            loss = {'lm_f': loss_lm_forward.item(),
+                    'lm_b': loss_lm_backward.item(),
                     'negLogProb': negLogProb.item()}
 
             utils.progress_bar(i/len(train_iter), loss, epoch)

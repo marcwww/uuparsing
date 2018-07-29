@@ -30,6 +30,6 @@ def progress_bar(percent, last_loss, epoch):
         " " * (40 - fill),
         percent,
         epoch,
-        last_loss['lm_l'],
-        last_loss['lm_r'],
+        last_loss['lm_f'],
+        last_loss['lm_b'],
         last_loss['negLogProb']), end='')
