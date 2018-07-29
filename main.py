@@ -40,6 +40,7 @@ def train(model, iters, opt, criterion_lm, optim):
                     'negLogProb': negLogProb.item()}
 
             utils.progress_bar(i/len(train_iter), loss, epoch)
+        print('\n')
 
         # valid(model, valid_iter, opt)
 
