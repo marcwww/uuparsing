@@ -158,8 +158,8 @@ class StackRNN(nn.Module):
         negLogProb = -1 * self.top2logProb(stack[:, -1, :])
 
         we_T = self.embedding.weight.transpose(0, 1)
-        logits_right = torch.matmul(buf_outs[:-1], we_T)
         logits_left = torch.matmul(buf_outs[1:], we_T)
+        logits_right = torch.matmul(buf_outs[:-1], we_T)
 
         return logits_left, logits_right, negLogProb
 

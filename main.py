@@ -26,9 +26,9 @@ def train(model, iters, opt, criterion_lm, optim):
                 model(inputs)
 
             loss_lm_left = criterion_lm(logits_left.view(-1, model.voc_size),
-                                        inputs[1:].view(-1))
+                                        inputs[:-1].view(-1))
             loss_lm_right = criterion_lm(logits_right.view(-1, model.voc_size),
-                                         inputs[:-1].view(-1))
+                                         inputs[1:].view(-1))
             loss = (1-opt.lm_coef) * (loss_lm_left + loss_lm_right)/2 + \
                    opt.lm_coef * negLogProb
 
