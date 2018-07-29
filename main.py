@@ -29,7 +29,9 @@ def train(model, iters, opt, criterion_lm, optim):
                                         inputs[1:].view(-1))
             loss_lm_backward = criterion_lm(logits_backward.view(-1, model.voc_size),
                                          inputs[:-1].view(-1))
-            loss = (1-opt.lm_coef) * (loss_lm_forward + loss_lm_backward)/2 + \
+            # loss = (1-opt.lm_coef) * (loss_lm_forward + loss_lm_backward)/2 + \
+            #        opt.lm_coef * negLogProb
+            loss = (1 - opt.lm_coef) * (loss_lm_forward) / 2 + \
                    opt.lm_coef * negLogProb
 
             loss.backward()
