@@ -4,7 +4,12 @@ import os
 
 def get_iters(ftrain, fvalid, bsz, device, min_freq):
 
+    def tokenizer(txt):
+        res = [BOS] + txt.split(' ')
+        return res
+
     SEQ = torchtext.data.Field(sequential=True,
+                               tokenize=tokenizer,
                                pad_token=PAD,
                                unk_token=UNK,
                                eos_token=EOS)
