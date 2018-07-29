@@ -28,18 +28,23 @@ class BaseRNN(nn.Module):
         self.embedding = nn.Embedding(voc_size, edim,
                                 padding_idx=padding_idx)
 
-        # assert edim * 2 == hdim, 'hdim must be 2 times of edim'
-        # self.buf_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
+        assert edim * 2 == hdim, 'hdim must be 2 times of edim'
+        self.bi_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
 
-        self.gru = nn.GRU(edim, hdim)
 
     def forward(self, inputs):
         embs = self.embedding(inputs)
-        outputs, hidden = self.gru(embs)
+        # outputs: (seq_len, bsz, hdim)
+        outputs, hidden = self.bi_rnn(embs)
         we_T = self.embedding.weight.transpose(0, 1)
 
-        logits = torch.matmul(outputs, we_T)
-        return logits
+        # logits: (seq_len, bsz, voc_size)
+        outputs_f = outputs[:-1, :, :self.edim]
+        outputs_b = outputs[1:, :, self.edim:]
+        logits_f = torch.matmul(outputs_f, we_T)
+        logits_b = torch.matmul(outputs_b, we_T)
+
+        return logits_f, logits_b
 
 
 class StackRNN(nn.Module):

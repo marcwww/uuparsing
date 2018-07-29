@@ -21,10 +21,14 @@ def train(model, iters, opt, criterion_lm, optim):
             inputs = sample.seq
 
             model.zero_grad()
-            logits = model(inputs[:-1])
+            logits_f, logits_b = model(inputs)
 
-            loss = criterion_lm(logits.view(-1, model.voc_size),
+            loss_f = criterion_lm(logits_f.view(-1, model.voc_size),
                                   inputs[1:].view(-1))
+            loss_b = criterion_lm(logits_f.view(-1, model.voc_size),
+                                  inputs[:-1].view(-1))
+
+            loss = (loss_f + loss_b) / 2
 
             # logits_forward, logits_backward, negLogProb = \
             #     model(inputs)
@@ -45,8 +49,8 @@ def train(model, iters, opt, criterion_lm, optim):
             #         'lm_b': loss_lm_backward.item(),
             #         'negLogProb': negLogProb.item()}
 
-            loss = {'lm_f': loss.item(),
-                    'lm_b': 0,
+            loss = {'lm_f': loss_f.item(),
+                    'lm_b': loss_b.item(),
                     'negLogProb': 0}
 
             utils.progress_bar(i/len(train_iter), loss, epoch)
