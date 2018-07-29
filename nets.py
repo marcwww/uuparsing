@@ -16,6 +16,32 @@ class Avg(nn.Module):
 
         return vec.sum(dim=0)/bsz
 
+class BaseRNN(nn.Module):
+
+    def __init__(self, voc_size, edim, hdim, padding_idx):
+        super(BaseRNN, self).__init__()
+
+        self.voc_size = voc_size
+        self.edim = edim
+        self.hdim = hdim
+        self.padding_idx = padding_idx
+        self.embedding = nn.Embedding(voc_size, edim,
+                                padding_idx=padding_idx)
+
+        # assert edim * 2 == hdim, 'hdim must be 2 times of edim'
+        # self.buf_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
+
+        self.gru = nn.GRU(edim, hdim)
+
+    def forward(self, inputs):
+        embs = self.embedding(inputs)
+        outputs, hidden = self.gru(embs)
+        we_T = self.embedding.weight.transpose(0, 1)
+
+        logits = torch.matmul(outputs, we_T)
+        return logits
+
+
 class StackRNN(nn.Module):
 
     def __init__(self, voc_size, edim, hdim, stack_len, padding_idx):
