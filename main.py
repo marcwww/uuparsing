@@ -7,6 +7,7 @@ import torch
 import utils
 from torch import optim
 from torch import nn
+from torch.nn.utils import clip_grad_norm
 
 def train(model, iters, opt, criterion_lm, optim):
     train_iter = iters['train']
@@ -34,12 +35,13 @@ def train(model, iters, opt, criterion_lm, optim):
             loss_lm = criterion_lm(logits.view(-1, model.voc_size),
                                         inputs[1:].view(-1))
 
-            loss = loss_lm
+            # loss = loss_lm
 
-            # loss = opt.lm_coef * loss_lm + \
-            #        (1 - opt.lm_coef) * negLogProb
+            loss = opt.lm_coef * loss_lm + \
+                   (1 - opt.lm_coef) * negLogProb
 
             loss.backward()
+            clip_grad_norm(model.parameters(), 5)
             optim.step()
 
             loss = {'lm': loss_lm.item(),
