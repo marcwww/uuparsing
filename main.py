@@ -34,8 +34,10 @@ def train(model, iters, opt, criterion_lm, optim):
             loss_lm = criterion_lm(logits.view(-1, model.voc_size),
                                         inputs[1:].view(-1))
 
-            loss = opt.lm_coef * loss_lm + \
-                   (1 - opt.lm_coef) * negLogProb
+            loss = loss_lm
+
+            # loss = opt.lm_coef * loss_lm + \
+            #        (1 - opt.lm_coef) * negLogProb
 
             loss.backward()
             optim.step()
