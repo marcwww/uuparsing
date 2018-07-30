@@ -34,6 +34,10 @@ class BaseRNN(nn.Module):
 
     def forward(self, inputs):
         embs = self.embedding(inputs)
+        mask = inputs.data.eq(self.padding_idx)
+        mask_embs = mask.unsqueeze(-1).expand_as(embs)
+        embs.masked_fill_(mask_embs, 0)
+
         # outputs: (seq_len, bsz, hdim)
         outputs, hidden = self.bi_rnn(embs)
         we_T = self.embedding.weight.transpose(0, 1)
