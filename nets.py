@@ -72,9 +72,9 @@ class StackRNN(nn.Module):
         self.embedding = nn.Embedding(voc_size, edim,
                                 padding_idx=padding_idx)
 
-        assert edim * 2 == hdim, 'hdim must be 2 times of edim'
+        assert edim == hdim, 'hdim must be equal to edim'
 
-        self.buf_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
+        self.buf_rnn = nn.GRU(edim, hdim)
         self.stack_rnncell = nn.GRUCell(edim, hdim)
         self.stack = nn.Parameter(torch.zeros(stack_len, hdim),
                                   requires_grad=False)
@@ -143,23 +143,23 @@ class StackRNN(nn.Module):
         # W_up_n: (stack_len, stack_len, stack_len)
         # res_pop_n: (stack_len, bsz, stack_len, hdim)
         res_pop_n = self.W_up_n.unsqueeze(1).matmul(stack.unsqueeze(0))
+        # leave room to the unified hidden
+        res_pop_n = self.W_down.matmul(res_pop_n)
 
         # V_avg: (stack_len, stack_len)
         # to_push_back: (stack_len, bsz, 1, hdim)
         to_push_back = self.V_avg.unsqueeze(1).unsqueeze(1).\
             matmul(stack.unsqueeze(0))
-
-        # res_pop_push: (stack_len, bsz, stack_len, hdim)
-        res_pop_push = res_pop_n + to_push_back
+        res_pop_n[:, :, 0, :] = to_push_back
 
         # p_pop_n: (stack_len, bsz, 1, 1)
         p_pop_n = p_pop_n.transpose(0, 1).unsqueeze(-1).unsqueeze(-1)
 
         # res_xxx: (bsz, stack_len, hdim)
-        res_pop_wsum = (p_pop_n * res_pop_push).sum(0)
+        res_pop_wsum = (p_pop_n * res_pop_n).sum(0)
 
         res_push = self.W_down.matmul(stack)
-        res_push[:, -1, :] = to_push
+        res_push[:, 0, :] = to_push
 
         res_pass = stack
 
@@ -180,22 +180,20 @@ class StackRNN(nn.Module):
 
         # embs: (seq_len, bsz, edim)
         embs = self.embedding(inputs)
-        mask = inputs.data.eq(self.padding_idx)
-        mask_embs = mask.unsqueeze(-1).expand_as(embs)
-        embs.masked_fill_(mask_embs, 0)
+        # mask = inputs.data.eq(self.padding_idx)
+        # mask_embs = mask.unsqueeze(-1).expand_as(embs)
+        # embs.masked_fill_(mask_embs, 0)
 
         # outputs: (seq_len, bsz, hdim)
         buf_outs, _ = self.buf_rnn(embs)
 
-        for emb in embs:
-            # emb: (bsz, edim)
+        for out in buf_outs:
             # to_push: (bsz, hdim)
-            to_push = self.stack_rnncell(emb, stack_hid)
-            # stack_top: (bsz, hdim)
-            stack_top = stack[:, -1, :]
+            to_push = out
+            stack_top = stack[:, 0, :]
             buf_atten = self.attention(to_push, buf_outs)
             # config: (bsz, hdim * 3)
-            config = torch.cat([to_push, stack_top, buf_atten], dim=1)
+            config = torch.cat([to_push, stack_top, buf_atten])
             # action: (bsz, 1 + stack_len + 1)
             action = self.config2act(config)
 

@@ -33,3 +33,10 @@ def progress_bar(percent, last_loss, epoch):
         last_loss['lm_f'],
         last_loss['lm_b'],
         last_loss['negLogProb']), end='')
+
+if __name__ == '__main__':
+    up, down = shift_matrix(3)
+    x = np.array([[0,1,2]]).transpose()
+    print(x)
+    print(up.dot(x))
+    print(down)
