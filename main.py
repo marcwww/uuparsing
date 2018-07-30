@@ -29,13 +29,13 @@ def train(model, iters, opt, criterion_lm, optim):
             # loss = (loss_f + loss_b) / 2
 
             logits, negLogProb = \
-                model(inputs)
+                model(inputs[:-1])
 
             loss_lm = criterion_lm(logits.view(-1, model.voc_size),
                                         inputs[1:].view(-1))
 
-            loss = (1 - opt.lm_coef) * loss_lm + \
-                   opt.lm_coef * negLogProb
+            loss = opt.lm_coef * loss_lm + \
+                   (1 - opt.lm_coef) * negLogProb
 
             loss.backward()
             optim.step()

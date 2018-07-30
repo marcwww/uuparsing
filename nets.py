@@ -206,7 +206,7 @@ class StackRNN(nn.Module):
         we_T = self.embedding.weight.transpose(0, 1)
 
         # logits: (seq_len - 1, bsz, voc_size)
-        logits = torch.matmul(buf_outs[:-1,:,:self.edim], we_T)
+        logits = torch.matmul(buf_outs, we_T)
 
         return logits, negLogProb
 
