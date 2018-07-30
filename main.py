@@ -26,7 +26,8 @@ def train(model, iters, opt, criterion_lm, optim):
             loss_b = criterion_lm(logits_f.view(-1, model.voc_size),
                                   inputs[:-1].view(-1))
 
-            loss = (loss_f + loss_b) / 2
+            loss = loss_f
+            # loss = (loss_f + loss_b) / 2
 
             # logits_forward, logits_backward, negLogProb = \
             #     model(inputs)
