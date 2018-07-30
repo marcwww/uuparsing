@@ -25,9 +25,13 @@ def get_iters(ftrain, fvalid, bsz, device, min_freq):
 
     train_iter = torchtext.data.Iterator(train, batch_size=bsz,
                                          sort=False, repeat=False,
+                                         sort_key=lambda x: len(x.seq),
+                                         sort_within_batch=True,
                                          device=device)
     valid_iter = torchtext.data.Iterator(valid, batch_size=bsz,
                                          sort=False, repeat=False,
+                                         sort_key=lambda x: len(x.seq),
+                                         sort_within_batch=True,
                                          device=device)
 
     return train_iter, valid_iter, SEQ

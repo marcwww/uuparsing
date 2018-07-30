@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import utils
 from macros import *
 import crash_on_ipy
+from torch.nn.utils.rnn import pad_packed_sequence,\
+    pack_padded_sequence
 
 class Avg(nn.Module):
 
@@ -33,14 +35,20 @@ class BaseRNN(nn.Module):
 
 
     def forward(self, inputs):
+        # inputs: (seq_len, bsz)
+        seq_len, bsz = inputs.shape
         embs = self.embedding(inputs)
+        # mask: (seq_len, bsz)
         mask = inputs.data.eq(self.padding_idx)
-        mask_embs = mask.unsqueeze(-1).expand_as(embs)
-        embs.masked_fill_(mask_embs, 0)
+        # input_lens: (bsz)
+        input_lens = seq_len - mask.sum(dim=0)
+        embs_p = pack_padded_sequence(embs, input_lens)
 
         # outputs: (seq_len, bsz, hdim)
-        outputs, hidden = self.bi_rnn(embs)
+        outputs_p, hidden = self.bi_rnn(embs_p)
         we_T = self.embedding.weight.transpose(0, 1)
+
+        outputs, _ = pad_packed_sequence(outputs_p)
 
         # logits: (seq_len, bsz, voc_size)
         outputs_f = outputs[:-1, :, :self.edim]
