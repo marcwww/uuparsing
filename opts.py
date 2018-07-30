@@ -18,5 +18,5 @@ def train_opts(parser):
     group.add_argument('-gpu', type=int, default=-1)
     group.add_argument('-lr', type=float, default=1e-3)
     group.add_argument('-lm_coef', type=float, default=0.5)
-    group.add_argument('-wdecay', type=float, default=0.5)
+    group.add_argument('-wdecay', type=float, default=0)
 
