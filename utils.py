@@ -25,13 +25,12 @@ def init_model(model):
 def progress_bar(percent, last_loss, epoch):
     """Prints the progress until the next report."""
     fill = int(percent * 40)
-    print("\r[{}{}]: {:.4f}/epoch {:d} (Loss: {:.4f} {:.4f} {:.4f})".format(
+    print("\r[{}{}]: {:.4f}/epoch {:d} (Loss: {:.4f} {:.4f})".format(
         "=" * fill,
         " " * (40 - fill),
         percent,
         epoch,
-        last_loss['lm_f'],
-        last_loss['lm_b'],
+        last_loss['lm'],
         last_loss['negLogProb']), end='')
 
 if __name__ == '__main__':

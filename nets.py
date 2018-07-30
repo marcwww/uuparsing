@@ -58,10 +58,9 @@ class BaseRNN(nn.Module):
 
         return logits_f, logits_b
 
-
 class StackRNN(nn.Module):
 
-    def __init__(self, voc_size, edim, hdim, stack_len, padding_idx):
+    def __init__(self, voc_size, edim, hdim, stack_len, nsteps, padding_idx):
         super(StackRNN, self).__init__()
 
         self.voc_size = voc_size
@@ -71,6 +70,7 @@ class StackRNN(nn.Module):
         self.padding_idx = padding_idx
         self.embedding = nn.Embedding(voc_size, edim,
                                 padding_idx=padding_idx)
+        self.nsteps = nsteps
 
         assert edim == hdim, 'hdim must be equal to edim'
 
@@ -80,6 +80,7 @@ class StackRNN(nn.Module):
                                   requires_grad=False)
         self.init_stack_hid = nn.Parameter(torch.zeros(hdim),
                                            requires_grad=False)
+        self.config2chid = nn.Linear(3 * hdim, hdim)
         self.config2act = nn.Linear(3 * hdim, len(ACTIONS))
         W_up, W_down = torch.Tensor(utils.shift_matrix(stack_len))
         self.W_up = nn.Parameter(W_up,
@@ -107,6 +108,7 @@ class StackRNN(nn.Module):
         self.top2logProb = nn.Sequential(nn.Linear(hdim, 1),
                                          nn.LogSigmoid(),
                                          Avg())
+        self.unify = nn.ReLU()
 
     def attention(self, input, mems):
         # input: (bsz, hdim)
@@ -150,7 +152,7 @@ class StackRNN(nn.Module):
         # to_push_back: (stack_len, bsz, 1, hdim)
         to_push_back = self.V_avg.unsqueeze(1).unsqueeze(1).\
             matmul(stack.unsqueeze(0))
-        res_pop_n[:, :, 0, :] = to_push_back
+        res_pop_n[:, :, :1, :] = self.unify(to_push_back)
 
         # p_pop_n: (stack_len, bsz, 1, 1)
         p_pop_n = p_pop_n.transpose(0, 1).unsqueeze(-1).unsqueeze(-1)
@@ -175,8 +177,6 @@ class StackRNN(nn.Module):
         seq_len, bsz = inputs.shape
         # stack: (bsz, stack_len, hdim)
         stack = self.stack.expand(bsz, self.stack_len, self.hdim)
-        # stack_hid: (bsz, hdim)
-        stack_hid = self.init_stack_hid.expand(bsz, self.hdim)
 
         # embs: (seq_len, bsz, edim)
         embs = self.embedding(inputs)
@@ -187,32 +187,28 @@ class StackRNN(nn.Module):
         # outputs: (seq_len, bsz, hdim)
         buf_outs, _ = self.buf_rnn(embs)
 
-        for out in buf_outs:
-            # to_push: (bsz, hdim)
-            to_push = out
+        to_push = embs[0]
+        buf_atten = self.attention(to_push, buf_outs)
+        for _ in range(self.nsteps):
             stack_top = stack[:, 0, :]
-            buf_atten = self.attention(to_push, buf_outs)
             # config: (bsz, hdim * 3)
-            config = torch.cat([to_push, stack_top, buf_atten])
-            # action: (bsz, 1 + stack_len + 1)
+            config = torch.cat([to_push, stack_top, buf_atten], dim=1)
+            chid = self.config2chid(config)
             action = self.config2act(config)
+            to_push = self.attention(chid, embs)
 
             stack = self.update_stack(stack, action, to_push)
 
         # negLogProb: (1)
-        stack_top = stack[:, -1, :]
+        stack_top = stack[:, 0, :]
         negLogProb = -1 * self.top2logProb(stack_top)
 
         we_T = self.embedding.weight.transpose(0, 1)
-        # forward_outs: (seq_len-1, bsz, edim)
-        # backward_outs: (seq_len-1, bsz, edim)
-        forward_outs = buf_outs[:-1,:,:self.edim]
-        backward_outs = buf_outs[1:,:,self.edim:]
 
-        logits_forward = torch.matmul(forward_outs, we_T)
-        logits_backward = torch.matmul(backward_outs, we_T)
+        # logits: (seq_len - 1, bsz, voc_size)
+        logits = torch.matmul(buf_outs[:-1,:,:self.edim], we_T)
 
-        return logits_forward, logits_backward, negLogProb
+        return logits, negLogProb
 
 
 

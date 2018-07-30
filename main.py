@@ -19,37 +19,29 @@ def train(model, iters, opt, criterion_lm, optim):
             inputs = sample.seq
 
             model.zero_grad()
-            logits_f, logits_b = model(inputs)
-
-            loss_f = criterion_lm(logits_f.view(-1, model.voc_size),
-                                  inputs[1:].view(-1))
-            loss_b = criterion_lm(logits_f.view(-1, model.voc_size),
-                                  inputs[:-1].view(-1))
-
-            loss = (loss_f + loss_b) / 2
-
-            # logits_forward, logits_backward, negLogProb = \
-            #     model(inputs)
+            # logits_f, logits_b = model(inputs)
             #
-            # loss_lm_forward = criterion_lm(logits_forward.view(-1, model.voc_size),
-            #                             inputs[1:].view(-1))
-            # loss_lm_backward = criterion_lm(logits_backward.view(-1, model.voc_size),
-            #                              inputs[:-1].view(-1))
-            # loss = (1-opt.lm_coef) * (loss_lm_forward + loss_lm_backward)/2 + \
-            #        opt.lm_coef * negLogProb
-            # loss = (1 - opt.lm_coef) * (loss_lm_forward) / 2 + \
-            #        opt.lm_coef * negLogProb
+            # loss_f = criterion_lm(logits_f.view(-1, model.voc_size),
+            #                       inputs[1:].view(-1))
+            # loss_b = criterion_lm(logits_f.view(-1, model.voc_size),
+            #                       inputs[:-1].view(-1))
+            #
+            # loss = (loss_f + loss_b) / 2
+
+            logits, negLogProb = \
+                model(inputs)
+
+            loss_lm = criterion_lm(logits.view(-1, model.voc_size),
+                                        inputs[1:].view(-1))
+
+            loss = (1 - opt.lm_coef) * loss_lm + \
+                   opt.lm_coef * negLogProb
 
             loss.backward()
             optim.step()
 
-            # loss = {'lm_f': loss_lm_forward.item(),
-            #         'lm_b': loss_lm_backward.item(),
-            #         'negLogProb': negLogProb.item()}
-
-            loss = {'lm_f': loss_f.item(),
-                    'lm_b': loss_b.item(),
-                    'negLogProb': 0}
+            loss = {'lm': loss_lm.item(),
+                    'negLogProb': negLogProb.item()}
 
             utils.progress_bar(i/len(train_iter), loss, epoch)
         print('\n')
@@ -83,16 +75,17 @@ if __name__ == '__main__':
                                     min_freq=opt.min_freq,
                                     device=opt.gpu)
 
-    model = nets.BaseRNN(voc_size=len(SEQ.vocab.itos),
-                          edim=opt.edim,
-                          hdim=opt.hdim,
-                          padding_idx=SEQ.vocab.stoi[PAD]).to(device)
-
-    # model = nets.StackRNN(voc_size=len(SEQ.vocab.itos),
+    # model = nets.BaseRNN(voc_size=len(SEQ.vocab.itos),
     #                       edim=opt.edim,
     #                       hdim=opt.hdim,
-    #                       stack_len=opt.stack_len,
     #                       padding_idx=SEQ.vocab.stoi[PAD]).to(device)
+
+    model = nets.StackRNN(voc_size=len(SEQ.vocab.itos),
+                          edim=opt.edim,
+                          hdim=opt.hdim,
+                          stack_len=opt.stack_len,
+                          nsteps=opt.nsteps,
+                          padding_idx=SEQ.vocab.stoi[PAD]).to(device)
 
     utils.init_model(model)
     optimizer = optim.Adam(params=filter(lambda p: p.requires_grad,
