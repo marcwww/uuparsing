@@ -32,7 +32,9 @@ class BaseRNN(nn.Module):
 
         assert edim * 2 == hdim, 'hdim must be 2 times of edim'
         self.bi_rnn = nn.GRU(edim, hdim // 2, bidirectional=True)
-
+        self.top2logProb = nn.Sequential(nn.Linear(hdim, 1),
+                                         nn.LogSigmoid(),
+                                         Avg())
 
     def forward(self, inputs):
         # inputs: (seq_len, bsz)
@@ -48,7 +50,11 @@ class BaseRNN(nn.Module):
         outputs_p, hidden = self.bi_rnn(embs_p)
         we_T = self.embedding.weight.transpose(0, 1)
 
-        outputs, _ = pad_packed_sequence(outputs_p)
+        outputs, output_lens = pad_packed_sequence(outputs_p)
+        hid_f, hid_b = outputs[-1,:,:self.hdim//2], \
+                       outputs[0,:,self.hdim//2:]
+        hid = torch.cat([hid_f, hid_b], dim=1)
+        negLogProb = -1 * self.top2logProb(hid)
 
         # logits: (seq_len, bsz, voc_size)
         outputs_f = outputs[:-1, :, :self.edim]
@@ -56,7 +62,7 @@ class BaseRNN(nn.Module):
         logits_f = torch.matmul(outputs_f, we_T)
         logits_b = torch.matmul(outputs_b, we_T)
 
-        return logits_f, logits_b
+        return logits_f, logits_b, negLogProb
 
 class StackRNN(nn.Module):
 

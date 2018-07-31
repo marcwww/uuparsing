@@ -2,7 +2,7 @@ import argparse
 
 def model_opts(parser):
     group = parser.add_argument_group('model')
-    group.add_argument('-edim', type=int, default=100)
+    group.add_argument('-edim', type=int, default=50)
     group.add_argument('-hdim', type=int, default=100)
     group.add_argument('-stack_len', type=int, default=15)
     group.add_argument('-nsteps', type=int, default=100)
