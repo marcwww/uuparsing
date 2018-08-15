@@ -236,6 +236,7 @@ class PCFGRNN(nn.Module):
                                          nn.LogSigmoid(),
                                          Avg())
         self.compos_w = nn.Parameter(torch.Tensor(hdim, hdim))
+        self.init_prob = nn.Parameter(torch.zeros(1), requires_grad=False)
 
     def _compos_prob(self, shid1, shid2):
         shid2_T = shid2.unsqueeze(1).transpose(1, 2)
@@ -261,7 +262,7 @@ class PCFGRNN(nn.Module):
         for b in range(bsz):
             for i in range(input_lens[b]):
                 # log(1) = 0
-                table_logProbs[b, i, i] = torch.zeros(1)
+                table_logProbs[b, i, i] = self.init_prob
                 table_hids[b, i, i] = syn_hids[i, b, :].unsqueeze(0)
 
         # N = len(inputs)

@@ -12,7 +12,7 @@ def train_opts(parser):
     group.add_argument('-ftrain', type=str, default='ptb.train.txt')
     group.add_argument('-fvalid', type=str, default='ptb.valid.txt')
     # group.add_argument('-bsz', type=int, default=64)
-    group.add_argument('-bsz', type=int, default=32)
+    group.add_argument('-bsz', type=int, default=64)
     group.add_argument('-min_freq', type=int, default=1)
     group.add_argument('-nepoch', type=int, default=10)
     group.add_argument('-save_per', type=int, default=5)
