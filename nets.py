@@ -6,6 +6,7 @@ from macros import *
 import crash_on_ipy
 from torch.nn.utils.rnn import pad_packed_sequence,\
     pack_padded_sequence
+from collections import defaultdict
 
 class Avg(nn.Module):
 
@@ -215,6 +216,90 @@ class StackRNN(nn.Module):
         logits = torch.matmul(buf_outs, we_T)
 
         return logits, negLogProb
+
+class PCFGRNN(nn.Module):
+
+    def __init__(self, voc_size, edim, hdim, padding_idx):
+        super(PCFGRNN, self).__init__()
+
+        self.voc_size = voc_size
+        self.edim = edim
+        self.hdim = hdim
+        self.padding_idx = padding_idx
+        self.embedding = nn.Embedding(voc_size, edim,
+                                padding_idx=padding_idx)
+
+        self.lex_rnn = nn.GRU(edim, hdim)
+        self.syn_rnn = nn.GRU(hdim, hdim)
+        self.lex2POS = nn.Linear(hdim, hdim)
+        self.top2logProb = nn.Sequential(nn.Linear(hdim, 1),
+                                         nn.LogSigmoid(),
+                                         Avg())
+        self.compos_w = nn.Parameter(torch.Tensor(hdim, hdim))
+
+    def _compos_prob(self, shid1, shid2):
+        shid2 = shid2.transpose(0, 1)
+
+        out = shid1.matmul(self.compos_w).matmul(shid2)
+        return F.logsigmoid(out)
+
+
+    def forward(self, inputs):
+        inputs = inputs
+        embs = self.embedding(inputs)
+
+        table_logProbs = defaultdict(float)
+        table_hids = defaultdict(torch.Tensor)
+
+        lex_hids, _ = self.lex_rnn(embs)
+        syn_hids = self.lex2POS(lex_hids)
+
+        n = len(syn_hids)
+
+        for i in range(n):
+            # log(1) = 0
+            table_logProbs[i, i] = 0
+            table_hids[i, i] = syn_hids[i]
+
+        for l in range(1, n):
+            for i in range(n-l):
+                j = i + l
+                max_score = -10000
+                shid1_opt = None
+                shid2_opt = None
+                for k in range(i, j):
+                    shid1 = table_hids[i, k]
+                    shid2 = table_hids[k+1, j]
+                    candi_prob = table_logProbs[i, k] + table_logProbs[k+1, j] + self._compos_prob(shid1, shid2)
+                    if candi_prob.item() > max_score:
+                        max_score = candi_prob
+                        shid1_opt = shid1
+                        shid2_opt = shid2
+
+                table_logProbs[i, j] = max_score
+                syn_bigram = torch.cat([shid1_opt, shid2_opt], dim=0).unsqueeze(1)
+                syn_hid = self.syn_rnn(syn_bigram)[-1].squeeze(1)
+                table_hids[i, j] = syn_hid
+
+
+        logProb_whole_syn = table_logProbs[n-1, n-1]
+        we_T = self.embedding.weight.transpose(0, 1)
+        logProbs = F.log_softmax(torch.matmul(lex_hids, we_T))
+        logProbs_trans = torch.max(logProbs, dim=-1)[0]
+        logProb_whole_lex = logProbs_trans.sum()
+
+        return logProbs, logProb_whole_syn, logProb_whole_lex
+
+
+
+
+
+
+
+
+
+
+
 
 
 

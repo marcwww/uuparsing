@@ -20,22 +20,20 @@ def train(model, iters, opt, criterion_lm, optim):
             inputs = sample.seq
 
             model.zero_grad()
-            logits_f, logits_b, negLogProb = model(inputs)
-            #
-            loss_f = criterion_lm(logits_f.view(-1, model.voc_size),
-                                  inputs[1:].view(-1))
-            loss_b = criterion_lm(logits_f.view(-1, model.voc_size),
-                                  inputs[:-1].view(-1))
+            logProbs, logProb_whole_syn, logProb_whole_lex = model(inputs[:-1])
+
             #
             # loss = (loss_f + loss_b) / 2
 
             # logits, negLogProb = \
             #     model(inputs[:-1])
 
-            # loss_lm = criterion_lm(logits.view(-1, model.voc_size),
-            #                             inputs[1:].view(-1))
+            loss_lm = criterion_lm(logProbs.view(-1, model.voc_size),
+                                        inputs[1:].view(-1))
 
-            loss = opt.lm_coef * (loss_f+loss_b)/2 + (1 - opt.lm_coef) * negLogProb
+            loss_diff = torch.abs(logProb_whole_lex-logProb_whole_syn)
+
+            loss = opt.lm_coef * loss_lm + (1 - opt.lm_coef) * loss_lm
 
             # loss = opt.lm_coef * loss_lm + \
             #        (1 - opt.lm_coef) * negLogProb
@@ -44,8 +42,8 @@ def train(model, iters, opt, criterion_lm, optim):
             clip_grad_norm(model.parameters(), 5)
             optim.step()
 
-            loss = {'lm': (loss_f.item()+loss_b.item())/2,
-                    'negLogProb': negLogProb.item()}
+            loss = {'lm': loss_lm.item(),
+                    'diff': loss_diff.item()}
 
             utils.progress_bar(i/len(train_iter), loss, epoch)
         print('\n')
@@ -79,10 +77,16 @@ if __name__ == '__main__':
                                     min_freq=opt.min_freq,
                                     device=opt.gpu)
 
-    model = nets.BaseRNN(voc_size=len(SEQ.vocab.itos),
+    # model = nets.BaseRNN(voc_size=len(SEQ.vocab.itos),
+    #                       edim=opt.edim,
+    #                       hdim=opt.hdim,
+    #                       padding_idx=SEQ.vocab.stoi[PAD]).to(device)
+
+    model = nets.PCFGRNN(voc_size=len(SEQ.vocab.itos),
                           edim=opt.edim,
                           hdim=opt.hdim,
                           padding_idx=SEQ.vocab.stoi[PAD]).to(device)
+
 
     # model = nets.StackRNN(voc_size=len(SEQ.vocab.itos),
     #                       edim=opt.edim,

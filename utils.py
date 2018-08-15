@@ -31,7 +31,7 @@ def progress_bar(percent, last_loss, epoch):
         percent,
         epoch,
         last_loss['lm'],
-        last_loss['negLogProb']), end='')
+        last_loss['diff']), end='')
 
 if __name__ == '__main__':
     up, down = shift_matrix(3)
