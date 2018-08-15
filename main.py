@@ -18,6 +18,7 @@ def train(model, iters, opt, criterion_lm, optim):
         for i, sample in enumerate(train_iter):
             model.train()
             inputs = sample.seq
+            seq_len, bsz = inputs.shape
 
             model.zero_grad()
             logProbs, logProb_whole_syn, logProb_whole_lex = model(inputs[:-1])
@@ -31,7 +32,7 @@ def train(model, iters, opt, criterion_lm, optim):
             loss_lm = criterion_lm(logProbs.view(-1, model.voc_size),
                                         inputs[1:].view(-1))
 
-            loss_diff = torch.abs(logProb_whole_lex-logProb_whole_syn)
+            loss_diff = torch.abs(logProb_whole_lex-logProb_whole_syn).sum() / bsz
 
             loss = opt.lm_coef * loss_lm + (1 - opt.lm_coef) * loss_lm
 

@@ -238,55 +238,76 @@ class PCFGRNN(nn.Module):
         self.compos_w = nn.Parameter(torch.Tensor(hdim, hdim))
 
     def _compos_prob(self, shid1, shid2):
-        shid2 = shid2.transpose(0, 1)
-
-        out = shid1.matmul(self.compos_w).matmul(shid2)
+        shid2_T = shid2.unsqueeze(1).transpose(1, 2)
+        out = shid1.unsqueeze(1).matmul(self.compos_w).matmul(shid2_T)
         return F.logsigmoid(out)
 
-
     def forward(self, inputs):
+
+        seq_len, bsz = inputs.shape
         inputs = inputs
         embs = self.embedding(inputs)
+        mask = inputs.data.eq(self.padding_idx)
+        input_lens = seq_len - mask.sum(dim=0)
+        embs_p = pack_padded_sequence(embs, input_lens)
 
         table_logProbs = defaultdict(float)
         table_hids = defaultdict(torch.Tensor)
 
-        lex_hids, _ = self.lex_rnn(embs)
+        lex_hids_p, _ = self.lex_rnn(embs_p)
+        lex_hids, _ = pad_packed_sequence(lex_hids_p)
         syn_hids = self.lex2POS(lex_hids)
 
-        n = len(syn_hids)
+        for b in range(bsz):
+            for i in range(input_lens[b]):
+                # log(1) = 0
+                table_logProbs[b, i, i] = torch.zeros(1)
+                table_hids[b, i, i] = syn_hids[i, b, :].unsqueeze(0)
 
-        for i in range(n):
-            # log(1) = 0
-            table_logProbs[i, i] = 0
-            table_hids[i, i] = syn_hids[i]
+        # N = len(inputs)
+        # print(input_lens)
+        for b in range(bsz):
+            for l in range(1, input_lens[b]):
+                for i in range(input_lens[b] - l):
+                    j = i + l
 
-        for l in range(1, n):
-            for i in range(n-l):
-                j = i + l
-                max_score = -10000
-                shid1_opt = None
-                shid2_opt = None
-                for k in range(i, j):
-                    shid1 = table_hids[i, k]
-                    shid2 = table_hids[k+1, j]
-                    candi_prob = table_logProbs[i, k] + table_logProbs[k+1, j] + self._compos_prob(shid1, shid2)
-                    if candi_prob.item() > max_score:
-                        max_score = candi_prob
-                        shid1_opt = shid1
-                        shid2_opt = shid2
+                    # if j-i == 2:
+                    #     print('a')
 
-                table_logProbs[i, j] = max_score
-                syn_bigram = torch.cat([shid1_opt, shid2_opt], dim=0).unsqueeze(1)
-                syn_hid = self.syn_rnn(syn_bigram)[-1].squeeze(1)
-                table_hids[i, j] = syn_hid
+                    # (k, him)
+                    shid1s = torch.cat([table_hids[b, i, k] for k in range(i, j)], dim=0)
+                    shid2s = torch.cat([table_hids[b, k+1, j] for k in range(i, j)], dim=0)
+
+                    # (k)
+                    LogPCs = self._compos_prob(shid1s, shid2s).squeeze(-1).squeeze(-1)
+
+                    lst = [table_logProbs[b, i, k] for k in range(i, j)]
+                    # (k)
+                    LogPAs = torch.cat(lst, dim=0)
+                    LogPBs = torch.cat([table_logProbs[b, k+1, j] for k in range(i, j)], dim=0)
+
+                    # (k)
+                    LogPs = LogPAs + LogPBs + LogPCs
 
 
-        logProb_whole_syn = table_logProbs[n-1, n-1]
+                    # (1)
+                    max_score, idx_opt = torch.topk(LogPs, k=1, dim=0)
+                    # (1)
+                    table_logProbs[b, i, j] = max_score
+                    # print(b,i,j,max_score)
+
+                    # (2, hdim)
+                    syn_bigram = torch.cat([shid1s[idx_opt], shid2s[idx_opt]], dim=0)
+                    syn_bigram = syn_bigram.unsqueeze(1)
+                    syn_hid = self.syn_rnn(syn_bigram)[-1].squeeze(1)
+                    table_hids[b, i, j] = syn_hid
+
+        lst = [table_logProbs[b, 0, input_lens[b].item() - 1] for b in range(bsz)]
+        logProb_whole_syn = torch.cat(lst)
         we_T = self.embedding.weight.transpose(0, 1)
         logProbs = F.log_softmax(torch.matmul(lex_hids, we_T))
         logProbs_trans = torch.max(logProbs, dim=-1)[0]
-        logProb_whole_lex = logProbs_trans.sum()
+        logProb_whole_lex = logProbs_trans.sum(dim=0)
 
         return logProbs, logProb_whole_syn, logProb_whole_lex
 
